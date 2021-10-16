@@ -3,3 +3,5 @@
 *.pyc
 *.log
 modules/wip/
+.gitattributes
+.gitignore
