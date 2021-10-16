@@ -7,7 +7,7 @@ bot.py is the base file for running the bot and connecting all of the modules to
 
 Inside the modules folder is slasherUtils.py, this is where I keep all of my custom functions/classes for the bot. It's a little bit barren right now, as I made it when I was still fairly new to Python, so I've figured out better ways to do pretty much everything in there. Figured I'd keep it for historical purposes. :)
 
-Below I'll explain each module, and if you are a recruiter that was sent here via my Resume, I'd love to hear your thoughts on this project!
+Below I'll explain each module, and if you were sent here via my Resume, I'd love to hear your thoughts on this project!
 
 ## Starship API
 
