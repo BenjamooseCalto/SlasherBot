@@ -41,7 +41,3 @@ The NASA Public APIs have tons of cool data and things for me to play around wit
 Because everyone loves math!
 
 This module is (for now) here just for fun. There is only one function in it currently, which is a cool little mathematical algorithm that applies a set a rules to some numbers, and no matter what number you enter, and no matter how many times you iterate, it will always converge to 1. Cool stuff!
-
-## wip
-
-This folder is for all the stuff that I've conceptualized but haven't put any work into making them real. The biggest plan in there is to build a fully functioning casino within the Discord bot. (which of course uses fake currency like coins or bottle caps)
