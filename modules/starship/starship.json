@@ -1,0 +1,186 @@
+{
+    "tfrs": [
+        {
+            "_id": "61522e021adcdf001331d362",
+            "details": {
+                "uid": {
+                    "type": "FDC",
+                    "indexYear": "2011",
+                    "number": "3765",
+                    "dateIssued": "2021-09-27T20:44:00.000Z",
+                    "name": "211001-211031 Boca Chica 2NMR Brownville",
+                    "guid": "fb34780e-12b1-44a6-9cec-51725dd4f14a"
+                },
+                "dateEffective": "2021-10-01T00:01:00.000Z",
+                "dateExpire": "2021-10-31T23:59:00.000Z",
+                "purpose": null,
+                "location": {
+                    "city": "Brownsville",
+                    "state": "TEXAS"
+                },
+                "airspace": {
+                    "upper": {
+                        "value": "10000",
+                        "unit": "FT",
+                        "code": "ALT"
+                    },
+                    "lower": {
+                        "value": "0",
+                        "unit": "FT",
+                        "code": "HEI"
+                    }
+                },
+                "pointOfContact": null,
+                "dateEffectiveString": "9/30/2021, 7:01 PM CDT",
+                "dateExpireString": "10/31/2021, 6:59 PM CDT",
+                "airspaceString": "Surface - 10,000 FT"
+            },
+            "isRemoved": false,
+            "date": "2021-09-27T20:44:00.000Z",
+            "slug": "1_3765",
+            "dateOriginal": "09/27/2021 2044",
+            "notam": "1/3765",
+            "facility": "ZHU",
+            "state": null,
+            "description": null,
+            "link": "https://tfr.faa.gov/save_pages/detail_1_3765.html",
+            "createdAt": "2021-09-27T20:48:02.918Z",
+            "updatedAt": "2021-10-16T16:44:02.680Z",
+            "__v": 0,
+            "isActive": true,
+            "length": "744 hours",
+            "interval": "12:01 am \u2013 11:59 pm"
+        }
+    ],
+    "closures": [
+        {
+            "_id": "616989a241aec6001a517e41",
+            "isRemoved": false,
+            "type": "Primary Date",
+            "originalDate": "Monday, October 18, 2021",
+            "originalTime": "9:30 a.m. to 11:30 a.m.",
+            "status": "Intermittent Closure Scheduled",
+            "slug": "monday-october-18-2021-930-am-to-1130-am",
+            "startDate": "2021-10-18T14:30:00.000Z",
+            "endDate": "2021-10-18T16:30:00.000Z",
+            "createdAt": "2021-10-15T14:01:06.548Z",
+            "updatedAt": "2021-10-16T16:44:05.411Z",
+            "__v": 0,
+            "isActive": false,
+            "isCanceled": false,
+            "isRevoked": false,
+            "isConcluded": false,
+            "interval": "2:30 pm \u2013 4:30 pm",
+            "startDateString": "10/18/2021, 9:30 AM CDT",
+            "endDateString": "10/18/2021, 11:30 AM CDT"
+        },
+        {
+            "_id": "6166f5a1d9ee34001acb1f0c",
+            "isRemoved": false,
+            "type": "Primary Date",
+            "originalDate": "Monday, October 18, 2021",
+            "originalTime": "5:00 p.m. to 12:00 a.m.",
+            "status": "Closure Scheduled",
+            "slug": "monday-october-18-2021-500-pm-to-1200-am",
+            "startDate": "2021-10-18T22:00:00.000Z",
+            "endDate": "2021-10-19T05:00:00.000Z",
+            "createdAt": "2021-10-13T15:05:05.680Z",
+            "updatedAt": "2021-10-16T16:44:05.411Z",
+            "__v": 0,
+            "isActive": false,
+            "isCanceled": false,
+            "isRevoked": false,
+            "isConcluded": false,
+            "interval": "10:00 pm \u2013 5:00 am",
+            "startDateString": "10/18/2021, 5:00 PM CDT",
+            "endDateString": "10/19/2021, 12:00 AM CDT"
+        },
+        {
+            "_id": "6166f5a1d9ee34001acb1f0d",
+            "isRemoved": false,
+            "type": "Secondary Date",
+            "originalDate": "Tuesday, October 19, 2021",
+            "originalTime": "5:00 p.m. to 12:00 a.m.",
+            "status": "Closure Scheduled",
+            "slug": "tuesday-october-19-2021-500-pm-to-1200-am",
+            "startDate": "2021-10-19T22:00:00.000Z",
+            "endDate": "2021-10-20T05:00:00.000Z",
+            "createdAt": "2021-10-13T15:05:05.680Z",
+            "updatedAt": "2021-10-16T16:44:05.412Z",
+            "__v": 0,
+            "isActive": false,
+            "isCanceled": false,
+            "isRevoked": false,
+            "isConcluded": false,
+            "interval": "10:00 pm \u2013 5:00 am",
+            "startDateString": "10/19/2021, 5:00 PM CDT",
+            "endDateString": "10/20/2021, 12:00 AM CDT"
+        },
+        {
+            "_id": "6166f5a1d9ee34001acb1f0e",
+            "isRemoved": false,
+            "type": "Secondary Date",
+            "originalDate": "Wednesday, October 20, 2021",
+            "originalTime": "5:00 p.m. to 12:00 a.m.",
+            "status": "Closure Scheduled",
+            "slug": "wednesday-october-20-2021-500-pm-to-1200-am",
+            "startDate": "2021-10-20T22:00:00.000Z",
+            "endDate": "2021-10-21T05:00:00.000Z",
+            "createdAt": "2021-10-13T15:05:05.680Z",
+            "updatedAt": "2021-10-16T16:44:05.412Z",
+            "__v": 0,
+            "isActive": false,
+            "isCanceled": false,
+            "isRevoked": false,
+            "isConcluded": false,
+            "interval": "10:00 pm \u2013 5:00 am",
+            "startDateString": "10/20/2021, 5:00 PM CDT",
+            "endDateString": "10/21/2021, 12:00 AM CDT"
+        }
+    ],
+    "weather": {
+        "coord": {
+            "lon": -97.4975,
+            "lat": 25.9018
+        },
+        "weather": [
+            {
+                "id": 804,
+                "main": "Clouds",
+                "description": "overcast clouds",
+                "icon": "04d"
+            }
+        ],
+        "base": "stations",
+        "main": {
+            "temp": 22.09,
+            "feels_like": 22.13,
+            "temp_min": 20,
+            "temp_max": 23.84,
+            "pressure": 1024,
+            "humidity": 68
+        },
+        "visibility": 10000,
+        "wind": {
+            "speed": 4.47,
+            "deg": 250,
+            "gust": 9.83
+        },
+        "clouds": {
+            "all": 90
+        },
+        "dt": 1634402446,
+        "sys": {
+            "type": 2,
+            "id": 2005669,
+            "country": "US",
+            "sunrise": 1634387359,
+            "sunset": 1634428877
+        },
+        "timezone": -18000,
+        "id": 4676740,
+        "name": "Brownsville",
+        "cod": 200
+    },
+    "lastUpdatedDate": "2021-10-16T16:44:07.234Z"
+}
