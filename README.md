@@ -1,7 +1,7 @@
 # This is SlasherBot, my custom Discord Bot made in Python
 
 In here you can find the source code for my Discord bot, I've called it SlasherBot for now, but that will likely change.
-In the future this will also likely be moved to it's own repo once it gets bigger and is closer to being done. I don't have any plans to make this public unless for some reason it becomes useful.
+~~In the future this will also likely be moved to it's own repo once it gets bigger and is closer to being done.~~ (finally moved) I don't have any plans to make this public unless for some reason it becomes useful.
 
 bot.py is the base file for running the bot and connecting all of the modules to it. For now I've included a run.bat to run it in the command line if you prefer that. In the future I will make a GUI for the bot containing all kinds of cool information!
 
