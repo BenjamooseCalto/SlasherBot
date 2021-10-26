@@ -261,10 +261,10 @@ async def starship(ctx: SlashContext):
 async def slashApod(ctx: SlashContext):
     apod = Apod()
     apod.get_apod()
-    img = apod.hdurl if apod.hdurl != None else apod.url
+    author = apod.copyright if f" by {apod.copyright}" != None else ""
     embed = discord.Embed(
         title="Astronomy Picture of the Day",
-        description=f"{apod.title} by {apod.copyright}",
+        description=f"{apod.title}{author}",
         colour=discord.Colour.purple(),
     )
     embed.set_footer(text=f"Date: {apod.date}")
@@ -273,7 +273,7 @@ async def slashApod(ctx: SlashContext):
         icon_url="https://api.nasa.gov/assets/img/favicons/favicon-192.png",
     )
     embed.add_field(name="Explanation", value=apod.explanation)
-    embed.set_image(url=img)
+    embed.set_image(url=apod.url)
     await ctx.send(embed=embed)
 
 

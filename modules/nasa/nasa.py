@@ -25,14 +25,13 @@ class Apod:
         self.__index(apod)
 
     def __index(self, apod):
-        self.copyright = apod["copyright"]
+        self.copyright = apod["copyright"] if "copyright" in apod else None
         self.date = apod["date"]
         self.explanation = apod["explanation"]
-        self.hdurl = apod["hdurl"]
+        self.url = apod["hdurl"] if "hdurl" in apod else apod["url"]
         self.media_type = apod["media_type"]
         self.service_version = apod["service_version"]
         self.title = apod["title"]
-        self.url = apod["url"]
 
     def get_apod(self):
         with open(self.data_file, "r") as file:

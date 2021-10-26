@@ -104,8 +104,9 @@ class Weather:
             try:
                 if self.wind["speed"] < 3:
                     return f'VRB@{int(self.wind["speed"])}kts'
-                if self.wind["gust"] - self.wind["speed"] > 7:
-                    return f'{(self.wind["deg"])}@{int(self.wind["speed"])}G{int(self.wind["gust"])}kts'
+                if "gust" in self.wind:
+                    if self.wind["gust"] - self.wind["speed"] > 7:
+                        return f'{(self.wind["deg"])}@{int(self.wind["speed"])}G{int(self.wind["gust"])}kts'
                 else:
                     return f'{int(self.wind["deg"])}@{int(self.wind["speed"])}kts'
             except KeyError:
