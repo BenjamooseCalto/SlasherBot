@@ -4,3 +4,5 @@
 *.log
 modules/wip/
 modules/covid/
+modules/__init__.py
+modules/steam/
