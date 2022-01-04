@@ -2,11 +2,14 @@ import os
 import discord
 import openai
 import logging
+import asyncio
 
 from modules.math.threex import magicmath
 from modules.starship.starship import StarshipStatus
 from modules.nasa.nasa import Apod
 from modules.space.orbits import OrbitInformation
+from modules.wip.steam.games import goonGames
+from modules.wip.tarkov.tarko import get_item_by_name
 from discord_slash.model import ContextMenuType, SlashCommandPermissionType
 from random import randint
 from dotenv import load_dotenv
@@ -61,11 +64,12 @@ handler.setFormatter(
     logging.Formatter("%(asctime)s:%(levelname)s:%(name)s: %(message)s")
 )
 logger.addHandler(handler)
+logging.getLogger().addHandler(logging.StreamHandler())
 
 
 @bot.event
 async def on_ready():
-    print(f"{bot.user.name} has connected to Discord!")
+    logger.log(msg=f"{bot.user.name} has successfully connected to Discord!")
 
 
 @slash.context_menu(
@@ -368,6 +372,67 @@ async def orbit(ctx: SlashContext, body):
     )
     embed.add_field(name="Average Temperature", value=f"{data.avgTemp}K", inline=False)
     embed.add_field(name="Long Ascending Node", value=data.longAscNode, inline=False)
+    await ctx.send(embed=embed)
+
+
+@slash.slash(  # returns a random game the gang has in common
+    name="randomgame",
+    description="Returns a random game the gang owns",
+    guild_ids=[TESTGUILDID, LIVEGUILDID],
+)
+async def randomgame(ctx: SlashContext):
+    game = goonGames()
+    link = f"https://store.steampowered.com/app/{game}"
+    await ctx.send(link)
+
+
+@slash.slash(  # returns a quirky message on how to join our game servers
+    name="server",
+    description="Returns detailed instructions on how to join a Slasher Solutions server.",
+    guild_ids=[TESTGUILDID, LIVEGUILDID],
+)
+async def server_join_msg(ctx: SlashContext):
+    message = "Join any Slasher Solutions server by using `server.slashersolutions.com` in place of the IP address!"
+    embed = discord.Embed(
+        title="Slasher Servers", description=message, colour=discord.Colour.blue()
+    )
+    await ctx.send(embed=embed)
+
+
+@slash.slash(
+    name="tarkovitem",
+    description="Returns information about a Tarkov item",
+    guild_ids=[TESTGUILDID, LIVEGUILDID],
+    options=[
+        create_option(
+            name="item", description="Item to look up", required=True, option_type=3
+        )
+    ],
+)
+async def tarkovitem(ctx: SlashContext, item): #this barely works but is okay for a rough prototype
+    noFlea_entries_to_skip = ["avg24hPrice", "changeLast48h", "changeLast48h", "changeLast48hPercent", "low24hPrice", "high24hPrice"]
+    item_data = get_item_by_name(item)
+    embed = discord.Embed(title="Tarkov Item Information", colour=discord.Colour.blue())
+    embed.set_footer(text="Data Provided by Tarkov-Tools")
+    for key in item_data:
+        if item_data[key] == None:
+            continue
+        #if "noFlea" in item_data[key] and key in noFlea_entries_to_skip:
+        #    continue
+        match key:
+            case "updated": embed.set_footer(text=f"Last Updated: {item_data[key]} | Data Provided by Tarkov-Tools")
+            case "name": embed.set_author(name=item_data[key], icon_url=item_data["iconLink"])
+            case "basePrice": embed.add_field(name="Base Price", value=item_data[key], inline=False)
+            case "width": pass
+            case "height": embed.add_field(name="Size", value=f"{item_data[key]}x{item_data['width']}", inline=False)
+            case "types": pass
+            case "avg24hPrice": embed.add_field(name="Average Flea Market Price", value=item_data[key], inline=False)
+            case "accuracyModifier": embed.add_field(name="Accuracy Mod", value=item_data[key], inline=False)
+            case "recoilModifier": embed.add_field(name="Recoil Mod", value=item_data[key], inline=False)
+            case "ergonomicsModifier": embed.add_field(name="Ergonomics Mod", value=item_data[key], inline=False)
+            case "hasGrid": embed.add_field(name="Has Grid", value=item_data[key], inline=False)
+            case "blocksHeadphones": embed.add_field(name="Blocks Headphones", value=item_data[key], inline=False)
+            case "id": embed.add_field(name="ID", value=item_data[key], inline=False)
     await ctx.send(embed=embed)
 
 
