@@ -1,9 +1,10 @@
 # no matter what number you enter here, it will always converge to a loop of 4 > 2 > 1. This script stops at 1.
+from random import randint
 
 
-def magicmath(number):
+def magicmath(number=None):
 
-    start = number
+    start = number or randint(1, 999999)
     list = []
     steps = []
 

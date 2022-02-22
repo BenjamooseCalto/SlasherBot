@@ -2,7 +2,10 @@
 *.env
 *.pyc
 *.log
+*.bat
+*.json
 modules/wip/
 modules/covid/
-modules/__init__.py
+*/__init__.py
 modules/steam/
+modules/cache/

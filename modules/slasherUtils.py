@@ -1,151 +1,104 @@
+import os
+import json
 import logging
+import modules
+
 from datetime import datetime
 
 
-def main():
-    print("idiot")
-
-
-if __name__ == "__main__":
-    main()
-
-
-def get_UTC_Offset():  # who knows if this abomination works, finds the UTC offset for your local timezone
-    utc = datetime.utcnow()
-    utc = utc.hour
-    local = datetime.now()
-    local = local.hour
-    if local == 0:
-        diff = utc
-        diff = utc * -1
-    else:
-        diff = local - utc
-    return diff
-
-
-def get_dst():  # returns whether it is currently daylight savings time (in texas at least)
-    localtime = datetime.now()
-    month = localtime.month
-    day = localtime.day
-    hour = localtime.hour
-    if 3 <= month <= 11:
-        if month == 3:
-            if day >= 14:
-                if hour >= 2:
-                    return True
-                else:
-                    return False
-            else:
-                return False
-        elif month == 11:
-            if day <= 7:
-                if hour >= 2:
-                    return False
-                else:
-                    return True
-            else:
-                return False
-        else:
-            return True
+def create_directory(path: str):
+    if not os.path.exists(path):
+        os.makedirs(path)
     else:
         return False
 
 
-def logToFile(
-    user, guildid, event, **kwargs
-):  # logs information to the log file, it's terribly written but it was a challenge for me to make. probably just gonna stop using it or make it actually well made
-    day = datetime.now()
-    utcOffset = get_UTC_Offset()
-    dt = day.strftime("%m/%d/%y|%H:%M:%S")
-    logging.basicConfig(
-        filename="slasherBot/data/bot.log", encoding="utf-8", level=logging.INFO
-    )
-    if kwargs:
-        if event == "roll":
-            count = kwargs["count"]
-            size = kwargs["size"]
-            total = kwargs["rolls"]
-            logging.info(
-                f"[{dt}][UTC{utcOffset}]>- {user} rolled a {count}d{size} in Guild:{guildid} | Result: {total}"
-            )
-            print("Event Logged")
-        elif event == "cleanchat":
-            count = kwargs["count"]
-            if count == 0:
-                logging.info(
-                    f"[{dt}][UTC{utcOffset}]>- {user} tried to clean the chat in Guild:{guildid} | Removed {count} messages"
-                )
-            else:
-                logging.info(
-                    f"[{dt}][UTC{utcOffset}]>- {user} cleaned the chat in Guild:{guildid} | Removed {count} messages"
-                )
-            print("Event Logged")
-        elif event == "openai":
-            engine = kwargs["engine"]
-            input = kwargs["input"]
-            logging.info(
-                f"[{dt}][UTC{utcOffset}]>- {user} made an OpenAI call using {engine} in Guild:{guildid} | Input: {input}"
-            )
-            print("Event Logged")
+def get_timestamp():
+    return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
 
-class Conversion:
-    METERS = ["m", "meter", "meters"]
-    KILOMETERS = ["km", "kms", "kilometers"]
-    CELSIUS = ["c", "celsius"]
-    FAHRENHEIT = ["f", "fahrenheit"]
-    KELVIN = ["k", "kelvin"]
+def get_time_delta(start_time: str, end_time: str):
+    """Returns the difference between two times in minutes"""
+    t1 = datetime.strptime(start_time, "%Y-%m-%d_%H-%M-%S")
+    t2 = datetime.strptime(end_time, "%Y-%m-%d_%H-%M-%S")
 
-    def __init__(self, message):
-        self.message = message.lower()
+    delta = t2 - t1
 
-    def find_type(self):
-        self.words = self.message.split()
-        if self.words[0] == "convert":
-            self.inputUnit = self.words[1][-1]
-            self.outputUnit = self.words[-1][-1]
-            if self.inputUnit in self.FAHRENHEIT:
-                if self.outputUnit == "c":
-                    self.completion = self.convert_temp("f", "c")
-                elif self.outputUnit == "k":
-                    self.completion = self.convert_temp("f", "k")
-            elif self.inputUnit in self.CELSIUS:
-                if self.outputUnit == "f":
-                    self.completion = self.convert_temp("c", "f")
-                elif self.outputUnit == "k":
-                    self.completion = self.convert_temp("c", "k")
-            elif self.inputUnit in self.KELVIN:
-                if self.outputUnit == "f":
-                    self.completion = self.convert_temp("k", "f")
-                elif self.outputUnit == "c":
-                    self.completion = self.convert_temp("k", "c")
-        print(
-            f"{self.inputNumber}{self.inputUnit} in {self.outputUnit} is {self.completion}"
-        )
-        return self.completion
-
-    def convert_temp(self, input, output):
-        self.inputNumber = int(self.words[1][:-1])
-        if output == "c":
-            if input == "f":
-                self.convert = int((self.inputNumber - 32) * 5 / 9)
-            elif input == "k":
-                self.convert = int(self.inputNumber - 273.15)
-            else:
-                print("conversion error @ line 27 in convert_temp")
-        elif output == "k":
-            if input == "f":
-                self.convert = int((self.inputNumber - 32) * 5 / 9 + 273.15)
-            elif input == "c":
-                self.convert = int(self.inputNumber + 273.15)
-        elif output == "f":
-            if input == "c":
-                self.convert = int((self.inputNumber * 9 / 5) + 32)
-            elif input == "k":
-                self.convert = int((self.inputNumber - 273.15) * 9 / 5 + 32)
-        return self.convert
+    return int(delta.seconds / 60)
 
 
-message = "Convert 39K to F"
-conv = Conversion(message)
-conv.find_type()
+class DictToClass:
+    def __init__(self, d, target: object):
+        self.d = d
+        self.target = target
+
+    def convert(self):
+        if isinstance(self.d, dict):
+            item = self.target()
+            for key in self.d:
+                setattr(item, key, self.d[key])
+            return item
+        elif isinstance(self.d, list):
+            objects = []
+            for config in self.d:
+                item = self.target()
+                for key in config:
+                    setattr(item, key, config[key])
+                objects.append(item)
+            return objects
+
+
+class Cache:
+    CACHE_DIR = "modules\\cache"
+
+    def __init__(self):
+        self.logger = logging.getLogger(__name__)
+
+    def write_to_cache(
+        self, data: dict, module: str, file: str, encoder=json.JSONEncoder
+    ):
+        try:
+            self.validate_module(module)
+        except ValueError as e:
+            self.logger.error(e)
+            return False
+
+        self.logger.info(f"Writing to cache: {module}\\{file}")
+
+        cache_file = os.path.join(self.CACHE_DIR, module, file)
+        create_directory(os.path.dirname(cache_file))
+
+        data["last_updated"] = get_timestamp()
+
+        with open(cache_file, "w") as file:
+            json.dump(data, file, indent=4, cls=encoder)
+
+    def read_from_cache(self, module: str, file: str):
+        try:
+            self.validate_module(module)
+        except ValueError as e:
+            self.logger.error(e)
+            return False
+
+        cache_file = os.path.join(self.CACHE_DIR, module, file)
+        if os.path.exists(cache_file):
+            with open(cache_file, "r") as file:
+                data = json.load(file)
+                return data
+        else:
+            return None
+
+    def validate_module(self, *args: str):
+        invalid_modules = []
+        for module in args:
+            if module not in modules.all_modules:
+                invalid_modules.append(module)
+        if len(invalid_modules) > 0:
+            raise ValueError(f"Invalid module(s): {invalid_modules}")
+        else:
+            return True
+
+
+if __name__ == "__main__":
+    time = "2022-02-20_21-19-30"
+    print(get_time_delta(time, get_timestamp()))

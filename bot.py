@@ -1,26 +1,18 @@
+import modules
 import os
+import sys
 import discord
 import openai
 import logging
 import asyncio
 
-from modules.math.threex import magicmath
-from modules.starship.starship import StarshipStatus
-from modules.nasa.nasa import Apod
-from modules.space.orbits import OrbitInformation
-from modules.wip.steam.games import goonGames
-from modules.wip.tarkov.tarko import get_item_by_name
-from discord_slash.model import ContextMenuType, SlashCommandPermissionType
-from random import randint
 from dotenv import load_dotenv
-from discord.ext import commands
-from discord_slash import SlashCommand, SlashContext
-from discord_slash.context import MenuContext
-from discord_slash.utils.manage_commands import (
-    create_option,
-    create_permission,
-)
+from discord.ext import tasks
+from discord.enums import SlashCommandOptionType
 
+# note on the above imports, they are very finicky. one of the modules uses gevent instead of asyncio and it has strange behavior when loaded later
+
+# grabbing environment variables, setting a lot of global variables, most of which are not needed, but useful for testing.
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 GUILDNAME = os.getenv("DISCORD_GUILDNAME")
@@ -37,26 +29,12 @@ OWNER = str(os.getenv("OWNER"))
 OPENAI_FINE_TUNE_MODEL = str(os.getenv("FINE_TUNE_MODEL"))
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-DISCORD_API_URL = "https://discord.com/api/v9"
-CMDS_URL = (
-    f"https://discord.com/api/v9/applications/{APPID}/guilds/{TESTGUILDID}/commands"
-)
-CMDS_GLOBAL_URL = f"https://discord.com/api/v9/applications/{APPID}/commands"
-
-DIR = os.path.dirname(__file__)
+DIR = os.path.dirname(os.path.realpath(__file__))
 LOG_FILE = os.path.join(DIR, "slasherBot.log")
 
-bot = commands.Bot(command_prefix="!", intents=discord.Intents.all(), owner_id=OWNERID)
-slash = SlashCommand(bot, sync_commands=True)
+bot = discord.Bot(command_prefix="!", intents=discord.Intents.all(), owner_id=OWNERID)
 
-
-def isOwner(author):
-    if str(author) == str(OWNER):
-        return True
-    else:
-        return False
-
-
+# Logging
 logger = logging.getLogger("discord")
 logger.setLevel(logging.DEBUG)
 handler = logging.FileHandler(filename=LOG_FILE, encoding="utf-8", mode="a")
@@ -64,19 +42,88 @@ handler.setFormatter(
     logging.Formatter("%(asctime)s:%(levelname)s:%(name)s: %(message)s")
 )
 logger.addHandler(handler)
-logging.getLogger().addHandler(logging.StreamHandler())
+logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
 
-
+# logs when the bot is connected and ready to receive commands
 @bot.event
 async def on_ready():
-    logger.log(msg=f"{bot.user.name} has successfully connected to Discord!")
+    logger.info(f"{bot.user.name} has successfully connected to Discord!")
 
 
-@slash.context_menu(
-    target=ContextMenuType.USER, name="Summon", guild_ids=[LIVEGUILDID, TESTGUILDID]
-)
-async def Summon(ctx: MenuContext):
-    chan = await ctx.target_author.create_dm()
+@tasks.loop(minutes=15)
+async def check_for_game_updates():
+    await bot.wait_until_ready()
+    logger.info("Checking for game updates...")
+    role_to_mention = 863662006800089120
+    channel = bot.get_channel(857891498124247040)
+    steam = modules.SteamUpdates()
+    response = steam.get_app_info()
+    if response is not False:
+        keys = response.keys()
+        if len(keys) <= 1:
+            for app in response:
+                app_id = app
+
+            app = steam.get_app(app_id=int(app_id))
+
+            embed = discord.Embed(
+                color=discord.Color.blue(),
+                title=f"{app.name} Update Detected",
+                description=f"<@&{role_to_mention}>",
+                url=f"https://steamdb.info/app/{app_id}",
+            )
+            embed.set_author(
+                name="Steam Update",
+                url=f"https://store.steampowered.com/app/{app_id}",
+                icon_url="https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/Steam_icon_logo.svg/2048px-Steam_icon_logo.svg.png",
+            )
+            embed.set_image(url=response[app_id]["icon_url"])
+            embed.set_footer(text="Data Provided by Slasher Steam Updates")
+
+            old_data_keys = response[app_id]["old_data"].keys()
+            new_data_keys = response[app_id]["new_data"].keys()
+
+            for new_key in new_data_keys:
+                if new_key not in old_data_keys:
+                    embed.add_field(
+                        name="New Data",
+                        value=f"`{new_key}`: {response[app_id]['new_data'][new_key]}",
+                        inline=False,
+                    )
+                    continue
+                for key in old_data_keys:
+                    if key not in new_data_keys:
+                        removal = (
+                            f"`{key}`:{response[app_id]['old_data'][key]} --> Removed"
+                        )
+                        embed.add_field(
+                            name="Removed Data", value=removal, inline=False
+                        )
+                        continue
+                    else:
+                        comparison = f"`{key}`:{response[app_id]['old_data'][key]} --> `{new_key}`:{response[app_id]['new_data'][new_key]}"
+                        embed.add_field(
+                            name="Updated Data", value=comparison, inline=False
+                        )
+
+        else:
+            app_ids = []
+            for app in response:
+                app_ids.append(int(app))
+            embed = discord.Embed()
+            embed.set_author(name="Steam Updates")
+            embed.add_field(name="Multiple Games", value=app_ids)
+        await channel.send(embed=embed)
+    else:
+        logger.info("No game updates found.")
+
+
+check_for_game_updates.start()
+
+
+@bot.user_command(name="Summon", guild_ids=[LIVEGUILDID, TESTGUILDID])
+async def Summon(ctx: discord.ApplicationContext, target: discord.User):
+    chan = await target.create_dm()
     if ctx.author.voice == None:
         msg = f"{ctx.author.name} has summoned you!"
     else:
@@ -84,54 +131,45 @@ async def Summon(ctx: MenuContext):
     await chan.send(msg)
 
 
-@slash.slash(  # this command removes the [Original Message Deleted] messages from the free games channel
-    name="cleanchat",
-    description="Cleans old messages from free games channel",
-    guild_ids=[LIVEGUILDID, TESTGUILDID],
-    permissions={
-        LIVEGUILDID: [
-            create_permission(LIVEOWNERROLE, SlashCommandPermissionType.ROLE, True),
-            create_permission(LIVEADMINROLE, SlashCommandPermissionType.ROLE, True),
-            create_permission(LIVEADMINROLE2, SlashCommandPermissionType.ROLE, True),
-        ],
-        TESTGUILDID: [
-            create_permission(TESTADMINROLE, SlashCommandPermissionType.ROLE, True)
-        ],
-    },
-)
-async def cleanchat(ctx: SlashContext):
-    channel = discord.utils.get(bot.get_all_channels(), name="the-game-garage")
-    i = 0
-    async for message in channel.history():
-        if message.content == "[Original Message Deleted]":
-            i += 1
-            await message.delete()
-            print("message deleted")
+@bot.user_command(name="GetAvatar", guild_ids=[LIVEGUILDID, TESTGUILDID])
+async def GetAvatar(ctx: discord.ApplicationContext, target: discord.User):
+    if discord.is_owner(ctx.author):
+        chan = await ctx.author.create_dm()
+        msg = target.display_avatar
+        await chan.send(msg)
+    else:
+        await print("no.")
 
 
-@slash.slash(  # this rolls the bones, inputs are size, and count - size is the size of the die, count is how many dice you wish to roll
+# debug command, not really used much
+@bot.slash_command(name="test", guild_ids=[TESTGUILDID])
+async def test(ctx: discord.ApplicationContext):
+    await check_for_game_updates()
+    # steam = modules.SteamUpdates()
+    # bog = steam.get_app_info()
+    # await ctx.send(bog)
+
+
+"""
+@bot.slash_command(  # this rolls the bones, inputs are size, and count - size is the size of the die, count is how many dice you wish to roll
     name="roll",
     description="Rolls some dice",
     guild_ids=[TESTGUILDID, LIVEGUILDID],
     options=[
-        create_option(
-            name="size",
+        discord.Option(
+            discord.SlashCommandOptionType.INTEGER,
             description="Choose the size of the die you wish to roll",
             required=True,
-            option_type=4,
         ),
-        create_option(
-            name="count",
+        discord.Option(
+            discord.SlashCommandOptionType.INTEGER,
             description="Choose the number of times you wish to roll (max 10)",
             required=False,
-            option_type=4,
         ),
     ],
 )
-async def slashRoll(
-    ctx: SlashContext, size: int, count: int = 1
-):  # rewrote this function, i think it looks way better now, but its still probably not the best way to do this
-    author = ctx.author
+async def slashRoll(ctx: discord.ApplicationContext, size: int, count: int = 1):
+    author = ctx.interaction.user
     rolls = []
     i = 0
     while True:
@@ -146,7 +184,7 @@ async def slashRoll(
         colour=discord.Colour.red(),
     )
     embed.set_footer(text=f"This is not rigged in any way.")
-    embed.set_author(name=author.display_name, icon_url=author.avatar_url)
+    embed.set_author(name=author.display_name, icon_url=author.display_avatar)
     n = 1
     for roll in rolls:
         embed.add_field(name=f"Roll {n}:", value=roll, inline=False)
@@ -155,7 +193,8 @@ async def slashRoll(
             break
 
     embed.add_field(name="Total: ", value=sum(rolls), inline=False)
-    await ctx.send(embed=embed)
+    await ctx.respond(embed=embed)
+
 
 
 @slash.slash(  # this makes an OpenAI API call to finish your sentences, limited to Ada only for now because it's the cheapest model
@@ -168,7 +207,7 @@ async def slashRoll(
         )
     ],
 )
-async def finishSentence(ctx: SlashContext, input):
+async def finishSentence(ctx: discord.ApplicationContext, input):
     print(input)
     response = openai.Completion.create(
         engine="ada",
@@ -215,7 +254,7 @@ async def slashFlip(bet):
         )
     ],
 )
-async def convert_test(ctx: SlashContext, prompt):
+async def convert_test(ctx: discord.ApplicationContext, prompt):
     response = openai.Completion.create(
         model=OPENAI_FINE_TUNE_MODEL,
         prompt=prompt,
@@ -229,15 +268,16 @@ async def convert_test(ctx: SlashContext, prompt):
     response = response["choices"][0]["text"]
     final_response = response.replace(" ->", "")
     await ctx.send(f"Prompt: {prompt}\nResult: {final_response}")
+"""
 
 
-@slash.slash(  # this returns data from the starship status API, more details on that in modules/starship
+@bot.slash_command(  # this returns data from the starship status API, more details on that in modules/starship
     name="starship",
     description="Check up on Starship",
     guild_ids=[TESTGUILDID, LIVEGUILDID],
 )
-async def starship(ctx: SlashContext):
-    data = StarshipStatus(update=True)
+async def starship(ctx: discord.ApplicationContext):
+    data = modules.StarshipStatus(update=True)
     embed = discord.Embed(
         title="Starship Status",
         description="Weather, TFRs, and Road Closure Information",
@@ -257,13 +297,13 @@ async def starship(ctx: SlashContext):
     await ctx.send(embed=embed)
 
 
-@slash.slash(  # this uses NASA's astronomy picture of the day API to give you a cool picture
+@bot.slash_command(  # this uses NASA's astronomy picture of the day API to give you a cool picture
     name="apod",
     description="Astronomy Picture of the Day",
     guild_ids=[TESTGUILDID, LIVEGUILDID],
 )
-async def slashApod(ctx: SlashContext):
-    apod = Apod()
+async def slashApod(ctx: discord.ApplicationContext):
+    apod = modules.Apod()
     apod.get_apod()
     author = apod.copyright if f" by {apod.copyright}" != None else ""
     embed = discord.Embed(
@@ -281,39 +321,29 @@ async def slashApod(ctx: SlashContext):
     await ctx.send(embed=embed)
 
 
-@slash.slash(  # this uses cool math to make any number converge down to 1, and then tells the user the largest number it rose to, and how many steps it took to get to 1
-    name="threex",
-    description="Math Magic",
-    guild_ids=[TESTGUILDID, LIVEGUILDID],
-    options=[
-        create_option(
-            name="number",
-            description="see how many steps it will take to converge to 1",
-            required=True,
-            option_type=4,
-        )
-    ],
+@bot.slash_command(  # this uses cool math to make any number converge down to 1, and then tells the user the largest number it rose to, and how many steps it took to get to 1
+    name="threex", description="Math Magic", guild_ids=[TESTGUILDID, LIVEGUILDID]
 )
-async def three_x(ctx: SlashContext, number):
-    await ctx.send(f"> {magicmath(number)}")
+async def three_x(ctx: discord.ApplicationContext, number):
+    await ctx.send(f"> {modules.magicmath(number)}")
 
 
-@slash.slash(  # this makes an API call to "Le-Systeme Solaire" and retrieved orbital information about the requested body
+@bot.slash_command(  # this makes an API call to "Le-Systeme Solaire" and retrieved orbital information about the requested body
     name="orbit",
     description="Get Orbital information about a given body in our Solar System",
     guild_ids=[TESTGUILDID, LIVEGUILDID],
     options=[
-        create_option(
+        discord.Option(
+            SlashCommandOptionType.string,
             name="body",
             description="body you want information on",
             required=True,
-            option_type=3,
         )
     ],
 )
-async def orbit(ctx: SlashContext, body):
+async def orbit(ctx: discord.ApplicationContext, body):
     body = body.lower()
-    data = OrbitInformation(body)
+    data = modules.OrbitInformation(body)
     embed = discord.Embed(
         title=f"Orbital Information for {data.name}",
         description="Orbital numbers for a given body",
@@ -321,7 +351,7 @@ async def orbit(ctx: SlashContext, body):
     )
     type = "Planet" if data.isPlanet == True else "Moon"
     embed.set_footer(text="Data Provided by Le-Systeme Solaire")
-    embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.avatar_url)
+    embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.display_avatar)
     embed.add_field(name="Body Name", value=data.name, inline=True)
     embed.add_field(name="Body Type", value=type, inline=True)
     if type == "Planet":
@@ -375,64 +405,27 @@ async def orbit(ctx: SlashContext, body):
     await ctx.send(embed=embed)
 
 
-@slash.slash(  # returns a random game the gang has in common
+@bot.slash_command(  # returns a random game the gang has in common
     name="randomgame",
     description="Returns a random game the gang owns",
     guild_ids=[TESTGUILDID, LIVEGUILDID],
 )
-async def randomgame(ctx: SlashContext):
-    game = goonGames()
+async def randomgame(ctx: discord.ApplicationContext):
+    game = modules.goonGames()
     link = f"https://store.steampowered.com/app/{game}"
     await ctx.send(link)
 
 
-@slash.slash(  # returns a quirky message on how to join our game servers
+@bot.slash_command(  # returns a quirky message on how to join our game servers
     name="server",
     description="Returns detailed instructions on how to join a Slasher Solutions server.",
     guild_ids=[TESTGUILDID, LIVEGUILDID],
 )
-async def server_join_msg(ctx: SlashContext):
+async def server_join_msg(ctx: discord.ApplicationContext):
     message = "Join any Slasher Solutions server by using `server.slashersolutions.com` in place of the IP address!"
     embed = discord.Embed(
         title="Slasher Servers", description=message, colour=discord.Colour.blue()
     )
-    await ctx.send(embed=embed)
-
-
-@slash.slash(
-    name="tarkovitem",
-    description="Returns information about a Tarkov item",
-    guild_ids=[TESTGUILDID, LIVEGUILDID],
-    options=[
-        create_option(
-            name="item", description="Item to look up", required=True, option_type=3
-        )
-    ],
-)
-async def tarkovitem(ctx: SlashContext, item): #this barely works but is okay for a rough prototype
-    noFlea_entries_to_skip = ["avg24hPrice", "changeLast48h", "changeLast48h", "changeLast48hPercent", "low24hPrice", "high24hPrice"]
-    item_data = get_item_by_name(item)
-    embed = discord.Embed(title="Tarkov Item Information", colour=discord.Colour.blue())
-    embed.set_footer(text="Data Provided by Tarkov-Tools")
-    for key in item_data:
-        if item_data[key] == None:
-            continue
-        #if "noFlea" in item_data[key] and key in noFlea_entries_to_skip:
-        #    continue
-        match key:
-            case "updated": embed.set_footer(text=f"Last Updated: {item_data[key]} | Data Provided by Tarkov-Tools")
-            case "name": embed.set_author(name=item_data[key], icon_url=item_data["iconLink"])
-            case "basePrice": embed.add_field(name="Base Price", value=item_data[key], inline=False)
-            case "width": pass
-            case "height": embed.add_field(name="Size", value=f"{item_data[key]}x{item_data['width']}", inline=False)
-            case "types": pass
-            case "avg24hPrice": embed.add_field(name="Average Flea Market Price", value=item_data[key], inline=False)
-            case "accuracyModifier": embed.add_field(name="Accuracy Mod", value=item_data[key], inline=False)
-            case "recoilModifier": embed.add_field(name="Recoil Mod", value=item_data[key], inline=False)
-            case "ergonomicsModifier": embed.add_field(name="Ergonomics Mod", value=item_data[key], inline=False)
-            case "hasGrid": embed.add_field(name="Has Grid", value=item_data[key], inline=False)
-            case "blocksHeadphones": embed.add_field(name="Blocks Headphones", value=item_data[key], inline=False)
-            case "id": embed.add_field(name="ID", value=item_data[key], inline=False)
     await ctx.send(embed=embed)
 
 
