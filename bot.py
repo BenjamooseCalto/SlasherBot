@@ -2,11 +2,11 @@ import modules
 import os
 import sys
 import discord
-import openai
 import logging
 import asyncio
 
 from dotenv import load_dotenv
+from random import randint
 from discord.ext import tasks
 from discord.enums import SlashCommandOptionType
 
@@ -22,19 +22,19 @@ LIVEGUILDID = int(os.getenv("DISCORD_LIVEGUILDID"))
 LIVEOWNERROLE = int(os.getenv("DISCORD_LIVEOWNERROLE"))
 LIVEADMINROLE = int(os.getenv("DISCORD_LIVEADMINROLE"))
 LIVEADMINROLE2 = int(os.getenv("DISCORD_LIVEADMINROLE2"))
+GAMEUPDATE_CHANNEL = int(os.getenv("DISCORD_LIVE_GAMEUPDATE_CHANNEL"))
+GAMEUPDATE_TEST_CHANNEL = int(os.getenv("DISCORD_TEST_GAMEUPDATE_CHANNEL"))
 OWNERID = os.getenv("DISCORD_OWNERID")
 
 APPID = os.getenv("DISCORD_APPID")
 OWNER = str(os.getenv("OWNER"))
-OPENAI_FINE_TUNE_MODEL = str(os.getenv("FINE_TUNE_MODEL"))
-openai.api_key = os.getenv("OPENAI_API_KEY")
 
 DIR = os.path.dirname(os.path.realpath(__file__))
 LOG_FILE = os.path.join(DIR, "slasherBot.log")
 
 bot = discord.Bot(command_prefix="!", intents=discord.Intents.all(), owner_id=OWNERID)
 
-# Logging
+# Logging - I'm fairly certain this will just continue logging to the same file until it becomes too big and creates some sort of horrific problem, but I'm gonna leave it in because that sounds funny
 logger = logging.getLogger("discord")
 logger.setLevel(logging.DEBUG)
 handler = logging.FileHandler(filename=LOG_FILE, encoding="utf-8", mode="a")
@@ -50,26 +50,26 @@ async def on_ready():
     logger.info(f"{bot.user.name} has successfully connected to Discord!")
 
 
+# this function checks for game updates on steam, then posts them to the appropriate channel, pinging the correct roles
 @tasks.loop(minutes=15)
 async def check_for_game_updates():
     await bot.wait_until_ready()
     logger.info("Checking for game updates...")
-    role_to_mention = 863662006800089120
-    channel = bot.get_channel(857891498124247040)
-    steam = modules.SteamUpdates()
+    channel = bot.get_channel(GAMEUPDATE_CHANNEL)
+    steam = modules.SteamUpdates(logger)
     response = steam.get_app_info()
-    if response is not False:
-        keys = response.keys()
-        if len(keys) <= 1:
-            for app in response:
-                app_id = app
+    all_embeds = []
+    message = ""
+    if response is not False:  # creates an embed for each game update
+        for app in response:
+            app_id = app
 
             app = steam.get_app(app_id=int(app_id))
 
             embed = discord.Embed(
                 color=discord.Color.blue(),
                 title=f"{app.name} Update Detected",
-                description=f"<@&{role_to_mention}>",
+                description=modules.get_date(),
                 url=f"https://steamdb.info/app/{app_id}",
             )
             embed.set_author(
@@ -77,43 +77,39 @@ async def check_for_game_updates():
                 url=f"https://store.steampowered.com/app/{app_id}",
                 icon_url="https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/Steam_icon_logo.svg/2048px-Steam_icon_logo.svg.png",
             )
-            embed.set_image(url=response[app_id]["icon_url"])
             embed.set_footer(text="Data Provided by Slasher Steam Updates")
 
-            old_data_keys = response[app_id]["old_data"].keys()
-            new_data_keys = response[app_id]["new_data"].keys()
+            added = response[app_id]["added"]
+            removed = response[app_id]["removed"]
+            altered = response[app_id]["altered"]
+            watchlist = response[app_id]["watchlist"]
+            discord_role = response[app_id]["role"]
 
-            for new_key in new_data_keys:
-                if new_key not in old_data_keys:
+            if len(added) > 0:
+                for entry in added:
                     embed.add_field(
-                        name="New Data",
-                        value=f"`{new_key}`: {response[app_id]['new_data'][new_key]}",
+                        name=f"New {watchlist.data_type} added",
+                        value=f"`{entry}`: {added[entry]}",
                         inline=False,
                     )
-                    continue
-                for key in old_data_keys:
-                    if key not in new_data_keys:
-                        removal = (
-                            f"`{key}`:{response[app_id]['old_data'][key]} --> Removed"
-                        )
-                        embed.add_field(
-                            name="Removed Data", value=removal, inline=False
-                        )
-                        continue
-                    else:
-                        comparison = f"`{key}`:{response[app_id]['old_data'][key]} --> `{new_key}`:{response[app_id]['new_data'][new_key]}"
-                        embed.add_field(
-                            name="Updated Data", value=comparison, inline=False
-                        )
+            if len(removed) > 0:
+                for entry in removed:
+                    embed.add_field(
+                        name=f"{watchlist.data_type} removed",
+                        value=f"`{entry}`: {removed[entry]} --> **Removed**",
+                        inline=False,
+                    )
+            if len(altered) > 0:
+                for entry in altered["new"]:
+                    embed.add_field(
+                        name=f"{watchlist.data_type} altered",
+                        value=f"`{entry}`:{altered['old'][entry]} --> `{entry}`:{altered['new'][entry]}",
+                        inline=False,
+                    )
+            all_embeds.append(embed)
+            message += f"<@&{discord_role}> "
 
-        else:
-            app_ids = []
-            for app in response:
-                app_ids.append(int(app))
-            embed = discord.Embed()
-            embed.set_author(name="Steam Updates")
-            embed.add_field(name="Multiple Games", value=app_ids)
-        await channel.send(embed=embed)
+        await channel.send(message, embeds=all_embeds)
     else:
         logger.info("No game updates found.")
 
@@ -131,7 +127,7 @@ async def Summon(ctx: discord.ApplicationContext, target: discord.User):
     await chan.send(msg)
 
 
-@bot.user_command(name="GetAvatar", guild_ids=[LIVEGUILDID, TESTGUILDID])
+@bot.user_command(name="GetAvatar", guild_ids=[TESTGUILDID])
 async def GetAvatar(ctx: discord.ApplicationContext, target: discord.User):
     if discord.is_owner(ctx.author):
         chan = await ctx.author.create_dm()
@@ -150,28 +146,30 @@ async def test(ctx: discord.ApplicationContext):
     # await ctx.send(bog)
 
 
-"""
 @bot.slash_command(  # this rolls the bones, inputs are size, and count - size is the size of the die, count is how many dice you wish to roll
     name="roll",
     description="Rolls some dice",
     guild_ids=[TESTGUILDID, LIVEGUILDID],
     options=[
         discord.Option(
-            discord.SlashCommandOptionType.INTEGER,
+            SlashCommandOptionType.integer,
             description="Choose the size of the die you wish to roll",
             required=True,
+            name="size",
         ),
         discord.Option(
-            discord.SlashCommandOptionType.INTEGER,
+            SlashCommandOptionType.integer,
             description="Choose the number of times you wish to roll (max 10)",
             required=False,
+            name="count",
         ),
     ],
 )
 async def slashRoll(ctx: discord.ApplicationContext, size: int, count: int = 1):
-    author = ctx.interaction.user
+    author = ctx.author
     rolls = []
     i = 0
+    count = 1 if count is None else count
     while True:
         i += 1
         rolls.append(randint(1, size))
@@ -180,11 +178,11 @@ async def slashRoll(ctx: discord.ApplicationContext, size: int, count: int = 1):
 
     embed = discord.Embed(
         title="The Bones",
-        description=f"{author.display_name}'s Rolls: ",
+        description=f"{author.name}'s Rolls: ",
         colour=discord.Colour.red(),
     )
     embed.set_footer(text=f"This is not rigged in any way.")
-    embed.set_author(name=author.display_name, icon_url=author.display_avatar)
+    embed.set_author(name=author.name, icon_url=author.display_avatar)
     n = 1
     for roll in rolls:
         embed.add_field(name=f"Roll {n}:", value=roll, inline=False)
@@ -194,81 +192,6 @@ async def slashRoll(ctx: discord.ApplicationContext, size: int, count: int = 1):
 
     embed.add_field(name="Total: ", value=sum(rolls), inline=False)
     await ctx.respond(embed=embed)
-
-
-
-@slash.slash(  # this makes an OpenAI API call to finish your sentences, limited to Ada only for now because it's the cheapest model
-    name="openai",
-    description="Have OpenAI attempt to finish your sentence",
-    guild_ids=[TESTGUILDID, LIVEGUILDID],
-    options=[
-        create_option(
-            name="input", description="Enter a sentence", required=True, option_type=3
-        )
-    ],
-)
-async def finishSentence(ctx: discord.ApplicationContext, input):
-    print(input)
-    response = openai.Completion.create(
-        engine="ada",
-        prompt=input,
-        temperature=0.9,
-        max_tokens=50,
-        top_p=1,
-        frequency_penalty=0.0,
-        presence_penalty=0.6,
-        stop="\n",
-    )
-    response = response["choices"][0]["text"]
-
-    await ctx.send("Input: " + input + "\n\n" + input + response)
-
-
-@slash.slash(  # this is part of the mini-casino, much more to be added, most of this works though
-    name="flip",
-    description="Flip some coins",
-    guild_ids=[TESTGUILDID, LIVEGUILDID],
-    options=[
-        create_option(
-            name="bet",
-            description="What side will it land on?",
-            required=True,
-            option_type=3,
-        )
-    ],
-)
-async def slashFlip(bet):
-    flip = randint(0, 1)
-    side = "heads" if flip == 0 else "tails"
-    outcome = "won!" if side == bet else "lost!"
-    print(f"The coin lands on {side}. You {outcome}")
-
-
-@slash.slash(  # this uses my fine-tuned OpenAI model to pick out useful information from messages regarding unit conversions, work-in-progress
-    name="converttest",
-    description="convert with ai or something",
-    guild_ids=[TESTGUILDID, LIVEGUILDID],
-    options=[
-        create_option(
-            name="prompt", description="convert something", required=True, option_type=3
-        )
-    ],
-)
-async def convert_test(ctx: discord.ApplicationContext, prompt):
-    response = openai.Completion.create(
-        model=OPENAI_FINE_TUNE_MODEL,
-        prompt=prompt,
-        temperature=0.9,
-        max_tokens=50,
-        top_p=1,
-        frequency_penalty=0.0,
-        presence_penalty=0.6,
-        stop="\n",
-    )
-    response = response["choices"][0]["text"]
-    final_response = response.replace(" ->", "")
-    await ctx.send(f"Prompt: {prompt}\nResult: {final_response}")
-"""
 
 
 @bot.slash_command(  # this returns data from the starship status API, more details on that in modules/starship
@@ -284,7 +207,7 @@ async def starship(ctx: discord.ApplicationContext):
         colour=discord.Colour.blue(),
     )
     embed.set_footer(text=f"Last Updated: {data.update_date}")
-    embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.avatar_url)
+    embed.set_author(name=ctx.author.name, icon_url=ctx.author.display_avatar)
     embed.add_field(
         name=f"Current Weather in {data.location}:", value=data.weather, inline=False
     )

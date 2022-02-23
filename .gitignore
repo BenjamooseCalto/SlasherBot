@@ -7,5 +7,5 @@
 modules/wip/
 modules/covid/
 */__init__.py
-modules/steam/
+modules/steam/games.py
 modules/cache/

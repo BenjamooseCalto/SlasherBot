@@ -17,6 +17,10 @@ def get_timestamp():
     return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
 
+def get_date():
+    return datetime.now().strftime("%m-%d-%Y @ %H:%M")
+
+
 def get_time_delta(start_time: str, end_time: str):
     """Returns the difference between two times in minutes"""
     t1 = datetime.strptime(start_time, "%Y-%m-%d_%H-%M-%S")
