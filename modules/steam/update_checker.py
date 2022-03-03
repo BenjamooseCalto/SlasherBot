@@ -1,4 +1,3 @@
-from email.mime import base
 from steam.client import SteamClient
 from steam.enums import EResult
 
@@ -229,6 +228,7 @@ class SteamUpdates:
         updates = {str(app.id): "" for app in self.apps}
         app_update_found = False
         for app in checklist:  # check updates on every app
+            main_app = self.get_app(app_id=int(app))
             app_data = self.app_info["apps"][app]  # get app data for specific app
             old_app_data = self.old_data["apps"][app]  # same here but with the old data
             for watchlist in checklist[app]:  # check data for each watchlist
@@ -236,7 +236,9 @@ class SteamUpdates:
                     app_data = app_data[key]
                     old_app_data = old_app_data[key]
                 if app_data != old_app_data:
-                    update = Update(watchlist, app_data, old_app_data)
+                    update = Update(
+                        watchlist, app_data, old_app_data, main_app.discord_role
+                    )
                     updates[app] = update.create_output()
 
         updates = {k: v for k, v in updates.items() if v}  # remove empty app entries
@@ -248,9 +250,10 @@ class SteamUpdates:
                 app_update_found = True if len(updates[app]) > 0 else False
 
         if app_update_found:
-            update_string = "Update detected for: "
+            update_string = "Update detected for:"
             for app_id in self.get_updated_ids(updates):
-                update_string += f"{app_id}|"
+                update_string += f" {app_id},"
+            update_string = update_string[:-1]
             self.logger.info(update_string)
             self.logger.info(updates)
             return updates

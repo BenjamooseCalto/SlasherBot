@@ -14,12 +14,11 @@ TODAY = date.today()
 # astronomy picture of the day
 class Apod:
     def __init__(self):
-        self.url = "https://api.nasa.gov/planetary/apod"
+        self.nasa_url = "https://api.nasa.gov/planetary/apod"
         self.data_file = os.path.join(DATA_DIR, "apod.json")
 
     def __req(self):
-        apod = requests.get(f"{self.url}?api_key={NASA_API_KEY}")
-        apod = apod.json()
+        apod = requests.get(f"{self.nasa_url}?api_key={NASA_API_KEY}").json()
         with open(self.data_file, "w") as file:
             json.dump(apod, file, indent=4)
         self.__index(apod)

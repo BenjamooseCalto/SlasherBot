@@ -13,6 +13,16 @@ def create_directory(path: str):
         return False
 
 
+def log_start(logger: logging.Logger):
+    log_seperator(logger)
+    logger.info(f"{get_date()} - Starting SlasherBot...")
+    log_seperator(logger)
+
+
+def log_seperator(logger: logging.Logger):
+    logger.info("-----------------------------------------------------")
+
+
 def get_timestamp():
     return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 

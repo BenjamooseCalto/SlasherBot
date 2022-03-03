@@ -10,18 +10,13 @@ from random import randint
 from discord.ext import tasks
 from discord.enums import SlashCommandOptionType
 
-# note on the above imports, they are very finicky. one of the modules uses gevent instead of asyncio and it has strange behavior when loaded later
+# note on the above imports, they are very finicky. the steam module uses gevent instead of asyncio and it has strange behavior when loaded later
 
 # grabbing environment variables, setting a lot of global variables, most of which are not needed, but useful for testing.
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
-GUILDNAME = os.getenv("DISCORD_GUILDNAME")
 TESTGUILDID = int(os.getenv("DISCORD_TESTGUILDID"))
-TESTADMINROLE = int(os.getenv("DISCORD_TESTADMINROLE"))
 LIVEGUILDID = int(os.getenv("DISCORD_LIVEGUILDID"))
-LIVEOWNERROLE = int(os.getenv("DISCORD_LIVEOWNERROLE"))
-LIVEADMINROLE = int(os.getenv("DISCORD_LIVEADMINROLE"))
-LIVEADMINROLE2 = int(os.getenv("DISCORD_LIVEADMINROLE2"))
 GAMEUPDATE_CHANNEL = int(os.getenv("DISCORD_LIVE_GAMEUPDATE_CHANNEL"))
 GAMEUPDATE_TEST_CHANNEL = int(os.getenv("DISCORD_TEST_GAMEUPDATE_CHANNEL"))
 OWNERID = os.getenv("DISCORD_OWNERID")
@@ -32,17 +27,39 @@ OWNER = str(os.getenv("OWNER"))
 DIR = os.path.dirname(os.path.realpath(__file__))
 LOG_FILE = os.path.join(DIR, "slasherBot.log")
 
-bot = discord.Bot(command_prefix="!", intents=discord.Intents.all(), owner_id=OWNERID)
+activity = discord.Activity(
+    type=discord.ActivityType.watching,
+    name="Steam",
+)
 
-# Logging - I'm fairly certain this will just continue logging to the same file until it becomes too big and creates some sort of horrific problem, but I'm gonna leave it in because that sounds funny
+bot = discord.Bot(
+    command_prefix="!",
+    intents=discord.Intents.all(),
+    owner_id=OWNERID,
+    activity=activity,
+    status=discord.Status.online,
+)
+
+# Logging - this will just continue logging to the same file until it becomes too big and creates some sort of horrific problem, but I'm gonna leave it in because that sounds funny
+log_format = logging.Formatter("%(asctime)s:%(levelname)s:%(name)s: %(message)s")
+
 logger = logging.getLogger("discord")
 logger.setLevel(logging.DEBUG)
+
 handler = logging.FileHandler(filename=LOG_FILE, encoding="utf-8", mode="a")
-handler.setFormatter(
-    logging.Formatter("%(asctime)s:%(levelname)s:%(name)s: %(message)s")
-)
-logger.addHandler(handler)
-logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
+handler.setFormatter(log_format)
+
+logger.addHandler(handler)  # adds filehandler to our logger
+
+console_handler = logging.StreamHandler()
+console_handler.setFormatter(log_format)
+
+logger.addHandler(console_handler)  # adds console handler to our logger
+
+logger.debug(f"Using PyCord version {discord.__version__}")
+logger.debug(f"Using Python version {sys.version}")
+modules.log_start(logger)
+
 
 # logs when the bot is connected and ready to receive commands
 @bot.event
@@ -111,6 +128,7 @@ async def check_for_game_updates():
 
         await channel.send(message, embeds=all_embeds)
     else:
+        modules.log_seperator(logger)
         logger.info("No game updates found.")
 
 
