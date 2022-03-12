@@ -6,11 +6,11 @@ import logging
 import asyncio
 
 from dotenv import load_dotenv
-from random import randint
+from random import randint, choice
 from discord.ext import tasks
 from discord.enums import SlashCommandOptionType
 
-# note on the above imports, they are very finicky. the steam module uses gevent instead of asyncio and it has strange behavior when loaded later
+# note on the above imports, they are very finicky. the steam module (sometimes...?) uses gevent instead of asyncio and it has strange behavior when loaded later
 
 # grabbing environment variables, setting a lot of global variables, most of which are not needed, but useful for testing.
 load_dotenv()
@@ -21,45 +21,38 @@ GAMEUPDATE_CHANNEL = int(os.getenv("DISCORD_LIVE_GAMEUPDATE_CHANNEL"))
 GAMEUPDATE_TEST_CHANNEL = int(os.getenv("DISCORD_TEST_GAMEUPDATE_CHANNEL"))
 OWNERID = os.getenv("DISCORD_OWNERID")
 
-APPID = os.getenv("DISCORD_APPID")
-OWNER = str(os.getenv("OWNER"))
-
 DIR = os.path.dirname(os.path.realpath(__file__))
-LOG_FILE = os.path.join(DIR, "slasherBot.log")
-
-activity = discord.Activity(
-    type=discord.ActivityType.watching,
-    name="Steam",
-)
+LOG_FILE = os.path.join(DIR, "logs", f"bot_{modules.get_timestamp(day_only=True)}.log")
+LOG_LEVEL = logging.DEBUG
 
 bot = discord.Bot(
     command_prefix="!",
     intents=discord.Intents.all(),
     owner_id=OWNERID,
-    activity=activity,
     status=discord.Status.online,
+    auto_sync_commands=True,
 )
 
 # Logging - this will just continue logging to the same file until it becomes too big and creates some sort of horrific problem, but I'm gonna leave it in because that sounds funny
-log_format = logging.Formatter("%(asctime)s:%(levelname)s:%(name)s: %(message)s")
-
 logger = logging.getLogger("discord")
-logger.setLevel(logging.DEBUG)
-
-handler = logging.FileHandler(filename=LOG_FILE, encoding="utf-8", mode="a")
-handler.setFormatter(log_format)
-
-logger.addHandler(handler)  # adds filehandler to our logger
+log_format = logging.Formatter("[%(asctime)s]:[%(levelname)s:%(name)s]: %(message)s")
 
 console_handler = logging.StreamHandler()
 console_handler.setFormatter(log_format)
 
 logger.addHandler(console_handler)  # adds console handler to our logger
+logger.setLevel(LOG_LEVEL)
+
+handler = logging.FileHandler(filename=LOG_FILE, encoding="utf-8", mode="w")
+handler.setFormatter(log_format)
+
+logger.addHandler(handler)  # adds filehandler to our logger
+
+logger.propagate = False
 
 logger.debug(f"Using PyCord version {discord.__version__}")
 logger.debug(f"Using Python version {sys.version}")
-modules.log_start(logger)
-
+modules.log_start()
 
 # logs when the bot is connected and ready to receive commands
 @bot.event
@@ -67,33 +60,64 @@ async def on_ready():
     logger.info(f"{bot.user.name} has successfully connected to Discord!")
 
 
-# this function checks for game updates on steam, then posts them to the appropriate channel, pinging the correct roles
-@tasks.loop(minutes=15)
-async def check_for_game_updates():
+def get_random_activity():
+    activity_names = [
+        "Steam",
+        "Elden Ring",
+        "Dark Souls III",
+        "ROBLOX",
+        "Fortnite",
+        "Ukraine",
+        "Arma 3",
+        "Minecraft",
+        "World of Warcraft",
+    ]
+    activity_types = [
+        discord.ActivityType.watching,
+        discord.ActivityType.playing,
+        discord.ActivityType.streaming,
+    ]
+
+    name = choice(activity_names)
+    aType = (
+        discord.ActivityType.watching if name == "Ukraine" else choice(activity_types)
+    )
+
+    return discord.Activity(type=aType, name=name)
+
+
+@tasks.loop(minutes=30)
+async def randomize_activity():
     await bot.wait_until_ready()
+    logger.info("Randomizing activity...")
+    await bot.change_presence(activity=get_random_activity())
+
+
+# this function checks for game updates on steam, then posts them to the appropriate channel, pinging the correct roles
+@tasks.loop(minutes=5)
+async def check_for_game_updates():
+    await bot.wait_until_ready()  # have to wait until the bot is ready, or it will open a black hole or something
+    modules.log_seperator()
     logger.info("Checking for game updates...")
     channel = bot.get_channel(GAMEUPDATE_CHANNEL)
-    steam = modules.SteamUpdates(logger)
+    steam = modules.SteamUpdates()
     response = steam.get_app_info()
     all_embeds = []
     message = ""
     if response is not False:  # creates an embed for each game update
         for app in response:
-            app_id = app
+            logger.debug(f"Update Response: {response}")
 
-            app = steam.get_app(app_id=int(app_id))
+            app = steam.get_app(app_id=int(app))  # getting the app object
+            app_id = str(app.id)
 
             embed = discord.Embed(
                 color=discord.Color.blue(),
-                title=f"{app.name} Update Detected",
-                description=modules.get_date(),
+                title="Game Update",
+                description=f"{modules.get_date()} CST",
                 url=f"https://steamdb.info/app/{app_id}",
             )
-            embed.set_author(
-                name="Steam Update",
-                url=f"https://store.steampowered.com/app/{app_id}",
-                icon_url="https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/Steam_icon_logo.svg/2048px-Steam_icon_logo.svg.png",
-            )
+
             embed.set_footer(text="Data Provided by Slasher Steam Updates")
 
             added = response[app_id]["added"]
@@ -101,6 +125,20 @@ async def check_for_game_updates():
             altered = response[app_id]["altered"]
             watchlist = response[app_id]["watchlist"]
             discord_role = response[app_id]["role"]
+            app_icon = response[app_id]["icon"]
+            news = response[app_id]["news"]
+
+            embed.set_author(
+                name=f"{app.name} Update",
+                url=f"https://store.steampowered.com/app/{app_id}",
+                icon_url=app_icon,
+            )
+
+            if (
+                news
+            ):  # if the patch notes could be found, replace the default title/url with the patch notes
+                embed.title = news["title"]
+                embed.url = news["url"]
 
             if len(added) > 0:
                 for entry in added:
@@ -124,19 +162,27 @@ async def check_for_game_updates():
                         inline=False,
                     )
             all_embeds.append(embed)
-            message += f"<@&{discord_role}> "
+            if "public" in altered["new"]:
+                message += f"<@&{discord_role}> "  # mentions all relevant roles, but only if the public branch was updated
 
-        await channel.send(message, embeds=all_embeds)
+        await channel.send(
+            message, embeds=all_embeds
+        )  # finally sends all of our game update notifications
     else:
-        modules.log_seperator(logger)
         logger.info("No game updates found.")
+        modules.log_seperator()
 
 
+# starting our scheduled tasks here
 check_for_game_updates.start()
+randomize_activity.start()
+
+# below begins our bot commands, usable on Discord
 
 
 @bot.user_command(name="Summon", guild_ids=[LIVEGUILDID, TESTGUILDID])
 async def Summon(ctx: discord.ApplicationContext, target: discord.User):
+    logging.info(f"{ctx.author} summoned {target}.")
     chan = await target.create_dm()
     if ctx.author.voice == None:
         msg = f"{ctx.author.name} has summoned you!"
@@ -235,7 +281,7 @@ async def starship(ctx: discord.ApplicationContext):
             name=f"Road Closure [{closure.status}]:", value=closure, inline=False
         )
 
-    await ctx.send(embed=embed)
+    await ctx.respond(embed=embed)
 
 
 @bot.slash_command(  # this uses NASA's astronomy picture of the day API to give you a cool picture
@@ -259,14 +305,14 @@ async def slashApod(ctx: discord.ApplicationContext):
     )
     embed.add_field(name="Explanation", value=apod.explanation)
     embed.set_image(url=apod.url)
-    await ctx.send(embed=embed)
+    await ctx.respond(embed=embed)
 
 
 @bot.slash_command(  # this uses cool math to make any number converge down to 1, and then tells the user the largest number it rose to, and how many steps it took to get to 1
     name="threex", description="Math Magic", guild_ids=[TESTGUILDID, LIVEGUILDID]
 )
 async def three_x(ctx: discord.ApplicationContext, number):
-    await ctx.send(f"> {modules.magicmath(number)}")
+    await ctx.respond(f"> {modules.magicmath(number)}")
 
 
 @bot.slash_command(  # this makes an API call to "Le-Systeme Solaire" and retrieved orbital information about the requested body
@@ -343,7 +389,7 @@ async def orbit(ctx: discord.ApplicationContext, body):
     )
     embed.add_field(name="Average Temperature", value=f"{data.avgTemp}K", inline=False)
     embed.add_field(name="Long Ascending Node", value=data.longAscNode, inline=False)
-    await ctx.send(embed=embed)
+    await ctx.respond(embed=embed)
 
 
 @bot.slash_command(  # returns a random game the gang has in common
@@ -354,7 +400,7 @@ async def orbit(ctx: discord.ApplicationContext, body):
 async def randomgame(ctx: discord.ApplicationContext):
     game = modules.goonGames()
     link = f"https://store.steampowered.com/app/{game}"
-    await ctx.send(link)
+    await ctx.respond(link)
 
 
 @bot.slash_command(  # returns a quirky message on how to join our game servers
@@ -367,7 +413,7 @@ async def server_join_msg(ctx: discord.ApplicationContext):
     embed = discord.Embed(
         title="Slasher Servers", description=message, colour=discord.Colour.blue()
     )
-    await ctx.send(embed=embed)
+    await ctx.respond(embed=embed)
 
 
 if __name__ == "__main__":

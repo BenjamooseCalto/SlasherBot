@@ -1,3 +1,4 @@
 # Requirements to run the bot
 py-cord >= 2.0.0b4
 steam[client]
+python-dotenv

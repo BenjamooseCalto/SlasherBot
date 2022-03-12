@@ -5,6 +5,8 @@ import modules
 
 from datetime import datetime
 
+logger = logging.getLogger("discord.slasher_utils")
+
 
 def create_directory(path: str):
     if not os.path.exists(path):
@@ -13,18 +15,21 @@ def create_directory(path: str):
         return False
 
 
-def log_start(logger: logging.Logger):
-    log_seperator(logger)
+def log_start():
+    log_seperator()
     logger.info(f"{get_date()} - Starting SlasherBot...")
-    log_seperator(logger)
+    log_seperator()
 
 
-def log_seperator(logger: logging.Logger):
+def log_seperator():
     logger.info("-----------------------------------------------------")
 
 
-def get_timestamp():
-    return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+def get_timestamp(day_only=False):
+    if day_only:
+        return datetime.now().strftime("%Y-%m-%d")
+    else:
+        return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
 
 def get_date():
@@ -63,10 +68,7 @@ class DictToClass:
 
 
 class Cache:
-    CACHE_DIR = "modules\\cache"
-
-    def __init__(self):
-        self.logger = logging.getLogger(__name__)
+    CACHE_DIR = os.path.join(os.path.dirname(__file__), "cache")
 
     def write_to_cache(
         self, data: dict, module: str, file: str, encoder=json.JSONEncoder
@@ -74,10 +76,10 @@ class Cache:
         try:
             self.validate_module(module)
         except ValueError as e:
-            self.logger.error(e)
+            logger.error(e)
             return False
 
-        self.logger.info(f"Writing to cache: {module}\\{file}")
+        logger.info(f"Writing to cache: {module}/{file}")
 
         cache_file = os.path.join(self.CACHE_DIR, module, file)
         create_directory(os.path.dirname(cache_file))
@@ -88,16 +90,18 @@ class Cache:
             json.dump(data, file, indent=4, cls=encoder)
 
     def read_from_cache(self, module: str, file: str):
+        logger.debug(f"CURRENT DIR: {os.getcwd()}")
         try:
             self.validate_module(module)
         except ValueError as e:
-            self.logger.error(e)
+            logger.error(e)
             return False
 
         cache_file = os.path.join(self.CACHE_DIR, module, file)
         if os.path.exists(cache_file):
             with open(cache_file, "r") as file:
                 data = json.load(file)
+                logger.debug(f"CACHE_DATA: {data}")
                 return data
         else:
             return None

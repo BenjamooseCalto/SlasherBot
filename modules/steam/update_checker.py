@@ -1,10 +1,18 @@
 from steam.client import SteamClient
 from steam.enums import EResult
+from steam.webapi import WebAPI
 
+import os
 import json
 import logging
 
+from dotenv import load_dotenv
 from modules import get_timestamp, get_time_delta, Cache
+
+logger = logging.getLogger("discord.slasher_updates")
+
+load_dotenv()
+STEAM_API_KEY = os.getenv("STEAM_API_KEY")
 
 
 class AppEncoder(json.JSONEncoder):
@@ -28,32 +36,31 @@ class Watchlist:
             self.path = path
             self.path = self.path.append(self.branch)
         else:
-            print(dictionary)
             self.data_type = dictionary["data_type"]
             self.name = dictionary["name"]
             self.branch = dictionary["branch"]
             self.path = dictionary["path"]
-            # self.path.append(self.branch)
 
     def get_path(self):
         return self.path
-
-    def navigate_to_path(self, data):
-        pass
 
 
 class Update:
     def __init__(
         self,
-        watchlist: Watchlist,
+        watchlist: Watchlist = None,
         new_data: dict = None,
         old_data: dict = None,
         discord_role: str = None,
+        app_id: int = None,
+        app_icon: str = None,
     ):
         self.watchlist = watchlist
         self.new_data = new_data
         self.old_data = old_data
         self.discord_role = discord_role
+        self.app_id = app_id
+        self.app_icon = app_icon
 
     def parse_data(self):
         added = {k: v for k, v in self.new_data.items() if k not in self.old_data}
@@ -67,16 +74,37 @@ class Update:
             "new": {k: v for k, v in self.new_data.items() if k in altered},
             "old": {k: v for k, v in self.old_data.items() if k in altered},
         }
-        return added, removed, altered, self.discord_role
+        if "public" in altered["new"].keys() or self.app_id == 108600:
+            news = self.get_game_news()
+        else:
+            news = None
+        return added, removed, altered, self.discord_role, news
+
+    def get_game_news(self):
+        api = WebAPI(STEAM_API_KEY)
+        news = api.ISteamNews.GetNewsForApp_v2(
+            appid=self.app_id, count=1, maxlength=300
+        )
+        logger.debug(f"Game news response: {news}")
+        if news["appnews"]["newsitems"][0]["feed_type"] == 0 or 1:
+            news = {
+                "title": news["appnews"]["newsitems"][0]["title"],
+                "url": news["appnews"]["newsitems"][0]["url"],
+            }
+            return news
+        else:
+            return None
 
     def create_output(self):
-        added, removed, altered, discord_role = self.parse_data()
+        added, removed, altered, discord_role, news = self.parse_data()
         output = {
             "watchlist": self.watchlist,
             "added": added,
             "removed": removed,
             "altered": altered,
             "role": discord_role,
+            "icon": self.app_icon,
+            "news": news,
         }
         return output
 
@@ -108,19 +136,10 @@ class SteamApp:
             the_list.append(Watchlist(dictionary=entry))
         return the_list
 
-    def add_to_watchlist(self, watchlist: Watchlist):
-        if watchlist not in self.watchlist:
-            self.watchlist.append(watchlist)
-
-    def remove_from_watchlist(self, watchlist_name: str):
-        for item in self.watchlist:
-            if item.name == watchlist_name:
-                self.watchlist.remove(item)
-
-
 class SteamUpdates:
-    def __init__(self, logger):
-        self.logger = logger
+    def __init__(
+        self,
+    ):
         self.client = SteamClient()
         self.apps = []
         self.cache = Cache()
@@ -128,9 +147,9 @@ class SteamUpdates:
 
         self.login()
         if self.load_config():
-            self.logger.info("Loaded config from cache")
+            logger.info("Loaded config from cache")
         else:
-            self.logger.info("No config found in cache")
+            logger.info("No config found in cache")
 
     def login(self):
         login = self.client.anonymous_login()
@@ -139,53 +158,11 @@ class SteamUpdates:
         else:
             return False
 
-    def add_app(self, *args: SteamApp):
-        for app in args:
-            if app in self.apps:
-                self.logger.info(f"{app.name} is already in the list")
-                continue
-            self.apps.append(app)
-        self.save_config()
-        return self.apps
-
-    def remove_app(self, *args: int):
-        for app in args:
-            for app in self.apps:
-                if app.id == app:
-                    self.apps.pop(app)
-
     def get_app(self, app_id: int = None, app_name: str = None):
         for app in self.apps:
             if app.id == app_id or app.name == app_name:
                 return app
         return None
-
-    def add_to_watchlist(
-        self, watchlist: Watchlist, app_id: int = None, app_name: str = None
-    ):
-        app = self.get_app(app_id, app_name)
-        if app is None:
-            self.logger.error("App not found")
-            return False
-        else:
-            app.add_to_watchlist(watchlist)
-            self.save_config()
-            return True
-
-    def remove_from_watchlist(
-        self,
-        *args: str,
-        app_id: int = None,
-        app_name: str = None,
-    ):
-        app = self.get_app(app_id, app_name)
-        if app is None:
-            self.logger.error("App not found")
-            return False
-        else:
-            app.remove_from_watchlist(args)
-            self.save_config()
-            return True
 
     def save_config(self):
         config = {"apps": self.apps}
@@ -204,18 +181,18 @@ class SteamUpdates:
             return False
 
     def get_app_info(self):
-        self.logger.info("Updating Steam app info...")
+        logger.info("Updating Steam app info...")
 
         self.old_data = self.cache.read_from_cache("steam", "app_info.json")
         if (
             get_time_delta(self.old_data["last_updated"], get_timestamp())
             < self.update_freq
         ):
-            self.logger.info("App info is up to date")
+            logger.info("App info is up to date")
             self.app_info = self.old_data
         else:
             self.app_info = self.client.get_product_info(
-                apps=[int(app.id) for app in self.apps],
+                apps=[app.id for app in self.apps],
             )
             self.cache.write_to_cache(self.app_info, "steam", "app_info.json")
             self.app_info = self.cache.read_from_cache("steam", "app_info.json")
@@ -223,12 +200,12 @@ class SteamUpdates:
         return self.check_for_updates()
 
     def check_for_updates(self):
-        self.logger.info("Checking for updates...")
-        checklist = {str(app.id): app.watchlist for app in self.apps}
-        updates = {str(app.id): "" for app in self.apps}
-        app_update_found = False
+        logger.info("Checking for updates...")
+        checklist = {str(app.id): app.watchlist for app in self.apps} # makes a dict of everything we need to check
+        updates = {str(app.id): "" for app in self.apps} # this is where we'll store the updates
+        app_update_found = False # just a variable to use if we find an update
         for app in checklist:  # check updates on every app
-            main_app = self.get_app(app_id=int(app))
+            main_app = self.get_app(app_id=int(app)) # get the app object
             app_data = self.app_info["apps"][app]  # get app data for specific app
             old_app_data = self.old_data["apps"][app]  # same here but with the old data
             for watchlist in checklist[app]:  # check data for each watchlist
@@ -237,7 +214,12 @@ class SteamUpdates:
                     old_app_data = old_app_data[key]
                 if app_data != old_app_data:
                     update = Update(
-                        watchlist, app_data, old_app_data, main_app.discord_role
+                        watchlist=watchlist,
+                        new_data=app_data,
+                        old_data=old_app_data,
+                        discord_role=main_app.discord_role,
+                        app_id=main_app.id,
+                        app_icon=self.get_game_metadata(int(app), "icon"),
                     )
                     updates[app] = update.create_output()
 
@@ -254,11 +236,11 @@ class SteamUpdates:
             for app_id in self.get_updated_ids(updates):
                 update_string += f" {app_id},"
             update_string = update_string[:-1]
-            self.logger.info(update_string)
-            self.logger.info(updates)
+            logger.debug(f"Update String: {update_string}")
+            logger.debug(f"Update Package: {updates}")
             return updates
         else:
-            self.logger.info("No updates found")
+            logger.info("No updates found")
             return False
 
     def get_updated_ids(self, updates):
@@ -268,14 +250,14 @@ class SteamUpdates:
             updated_apps.append(app_id)
         return updated_apps
 
-    def get_game_metadata(self, app_id: int):
-        icon = self.app_info["apps"][str(app_id)]["common"]["clienticon"]
-        icon_url = f"https://cdn.cloudflare.steamstatic.com/steamcommunity/public/images/apps/{app_id}/{icon}.jpg"
-        return icon_url
+    def get_game_metadata(self, app_id: int, key: str = "icon"):
+        match key:
+            case "icon":
+                icon = self.app_info["apps"][str(app_id)]["common"]["icon"]
+                icon_url = f"https://cdn.cloudflare.steamstatic.com/steamcommunity/public/images/apps/{app_id}/{icon}.jpg"
+                return icon_url
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.DEBUG)
-    base_logger = logging.getLogger(__name__)
-    a = SteamUpdates(base_logger)
-    print(a.get_app_info())
+    a = Update(app_id=1599340)
+    print(a.get_game_news())
