@@ -67,7 +67,7 @@ def get_random_activity():
         "Dark Souls III",
         "ROBLOX",
         "Fortnite",
-        "Ukraine",
+        "Slava Ukraini",
         "Arma 3",
         "Minecraft",
         "World of Warcraft",
@@ -80,7 +80,9 @@ def get_random_activity():
 
     name = choice(activity_names)
     aType = (
-        discord.ActivityType.watching if name == "Ukraine" else choice(activity_types)
+        discord.ActivityType.playing
+        if name == "Slava Ukraini"
+        else choice(activity_types)
     )
 
     return discord.Activity(type=aType, name=name)
