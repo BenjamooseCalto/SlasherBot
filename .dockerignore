@@ -1,0 +1,6 @@
+*/logs*
+.gitattributes
+.gitignore
+README.md
+run.bat
+modules/wip/

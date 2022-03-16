@@ -1,11 +1,12 @@
-
 *.env
 *.pyc
 *.log
 *.bat
 *.json
-modules/wip/
-modules/covid/
 */__init__.py
+__pycache__/
+*/__pycache__/
+logs/
+modules/wip/
 modules/steam/games.py
 modules/cache/

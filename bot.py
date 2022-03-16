@@ -88,7 +88,7 @@ def get_random_activity():
     return discord.Activity(type=aType, name=name)
 
 
-@tasks.loop(minutes=30)
+@tasks.loop(hours=1)
 async def randomize_activity():
     await bot.wait_until_ready()
     logger.info("Randomizing activity...")
@@ -116,7 +116,7 @@ async def check_for_game_updates():
             embed = discord.Embed(
                 color=discord.Color.blue(),
                 title="Game Update",
-                description=f"{modules.get_date()} CST",
+                description=f"{modules.get_date()} CDT",
                 url=f"https://steamdb.info/app/{app_id}",
             )
 
