@@ -48,7 +48,7 @@ handler.setFormatter(log_format)
 
 logger.addHandler(handler)  # adds filehandler to our logger
 
-logger.propagate = False
+logger.propagate = False  # this makes the log entries not repeat themselves
 
 logger.debug(f"Using PyCord version {discord.__version__}")
 logger.debug(f"Using Python version {sys.version}")

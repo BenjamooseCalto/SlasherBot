@@ -1,10 +1,12 @@
 # This is SlasherBot, my custom Discord Bot made in Python
 
+![License](https://img.shields.io/github/license/BenjamooseCalto/SlasherBot?style=flat-square) ![LastUpdate](https://img.shields.io/github/last-commit/BenjamooseCalto/SlasherBot?style=flat-square)
+
 In here you can find the source code for my Discord bot, I've called it SlasherBot for now, but that will likely change. I don't have any plans to make this public unless for some reason it becomes useful.
 
-`bot.py` is the base file for running the bot and connecting all of the modules to it. In the future I will make a GUI for the bot containing all kinds of cool information!
+`bot.py` is the base file for running the bot and connecting all of the modules to it. In the future I'll probably make a GUI for the bot containing all kinds of cool information, and controls or something.
 
-Inside the modules folder is slasherUtils.py, this is where I keep all of my custom functions/classes for the bot. ~~It's a little bit barren right now, as I made it when I was still fairly new to Python, so I've figured out better ways to do pretty much everything in there. Figured I'd keep it for historical purposes.~~ | Removed the useless functions and instead created more widely useful functions and classes that can be used from every other module. Also added `__init__.py` to the modules folder, allowing easier integration.
+Inside the modules folder is `slasherUtils.py`, this is where I keep all of my custom functions/classes for the bot. ~~It's a little bit barren right now, as I made it when I was still fairly new to Python, so I've figured out better ways to do pretty much everything in there. Figured I'd keep it for historical purposes.~~ | Removed the useless functions and instead created more widely useful functions and classes that can be used from every other module. Also added `__init__.py` to the modules folder, allowing easier integration.
 
 Below I'll explain each module, and if you were sent here via my Resume, I'd love to hear your thoughts on this project!
 
@@ -16,13 +18,13 @@ You can choose the game you want to watch, the specific attributes of the game, 
 
 Can also customize how you're notified. Right now it's limited to just sending a message in a chosen channel, but I'm going to allow the bot to DM specific users. Due to it being a private bot for my personal usage, I'm not planning on adding a system for users to customize their notifications. Maybe though, won't rule anything out.
 
-This module was a bit of a disaster to implement because the Steam API library I'm using utilizes `gevent` for asynchronous requests, while the rest of the bot uses `asyncio` - managed to fix it with some tweaking and a custom library I found called `asyncio_gevent`.
+This module was a bit of a disaster to implement because the [Steam API library](https://github.com/ValvePython/steam) I'm using utilizes `gevent` for asynchronous requests, while the rest of the bot uses `asyncio` - seems that if I just don't mess with it and instead load Steam before `asyncio` it works fine. This needs some additional research...
 
-This function is nowhere near perfect, and is incredibly jank, but it works well enough that I'm comfortable letting it run while I work on making it more robust.
+This function is nowhere near perfect, but it works fairly well and is very consistent. Recently added news to the update notifications, so it'll show the newest available patch notes when a patch is found, however this is not perfect, because sometimes developers are rather slow with releasing patch notes, or sometimes they aren't ever posted.
 
 --
 
-Updated slasherUtils.py with useful functions/classes.
+Updated `slasherUtils.py` with useful functions/classes.
 Removed all the `.json` files and `.bat` files as they're mostly useless. If for whatever reason you're interested in the raw API data, please check out the sources listed below.
 
 ## Starship API
