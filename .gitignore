@@ -10,3 +10,4 @@ logs/
 modules/wip/
 modules/steam/games.py
 modules/cache/
+modules/scraping/

@@ -15,13 +15,17 @@ def create_directory(path: str):
         return False
 
 
+def get_self_path():
+    return os.path.dirname(os.path.realpath(__file__))
+
+
 def log_start():
-    log_seperator()
+    log_separator()
     logger.info(f"{get_date()} - Starting SlasherBot...")
-    log_seperator()
+    log_separator()
 
 
-def log_seperator():
+def log_separator():
     logger.info("-----------------------------------------------------")
 
 
@@ -68,6 +72,8 @@ class DictToClass:
 
 
 class Cache:
+    """Class to easily access the cache directory"""
+
     CACHE_DIR = os.path.join(os.path.dirname(__file__), "cache")
 
     def write_to_cache(

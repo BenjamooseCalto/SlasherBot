@@ -14,6 +14,7 @@ logger = logging.getLogger("discord.slasher_updates")
 load_dotenv()
 STEAM_API_KEY = os.getenv("STEAM_API_KEY")
 
+# i'd like to acknowledge that this file is a little bit "rough" - i'm working on improving the readability and efficiency of it
 
 class AppEncoder(json.JSONEncoder):
     def default(self, o):
@@ -83,15 +84,16 @@ class Update:
     def get_game_news(self):
         api = WebAPI(STEAM_API_KEY)
         news = api.ISteamNews.GetNewsForApp_v2(
-            appid=self.app_id, count=1, maxlength=300
+            appid=self.app_id, count=5, maxlength=100
         )
         logger.debug(f"Game news response: {news}")
-        if news["appnews"]["newsitems"][0]["feed_type"] == 0 or 1:
-            news = {
-                "title": news["appnews"]["newsitems"][0]["title"],
-                "url": news["appnews"]["newsitems"][0]["url"],
-            }
-            return news
+        for item in news["appnews"]["newsitems"]:
+            if item["feedlabel"] == "Community Announcements":
+                news = {
+                    "title": item["title"],
+                    "url": item["url"],
+                }
+                return news
         else:
             return None
 

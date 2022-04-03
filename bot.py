@@ -12,7 +12,7 @@ from discord.enums import SlashCommandOptionType
 
 # note on the above imports, they are very finicky. the steam module (sometimes...?) uses gevent instead of asyncio and it has strange behavior when loaded later
 
-# grabbing environment variables, setting a lot of global variables, most of which are not needed, but useful for testing.
+# grabbing environment variables, setting a lot of global variables, some of which are not needed, but useful for testing.
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 TESTGUILDID = int(os.getenv("DISCORD_TESTGUILDID"))
@@ -20,6 +20,7 @@ LIVEGUILDID = int(os.getenv("DISCORD_LIVEGUILDID"))
 GAMEUPDATE_CHANNEL = int(os.getenv("DISCORD_LIVE_GAMEUPDATE_CHANNEL"))
 GAMEUPDATE_TEST_CHANNEL = int(os.getenv("DISCORD_TEST_GAMEUPDATE_CHANNEL"))
 OWNERID = os.getenv("DISCORD_OWNERID")
+DEBUG = False
 
 DIR = os.path.dirname(os.path.realpath(__file__))
 LOG_FILE = os.path.join(DIR, "logs", f"bot_{modules.get_timestamp(day_only=True)}.log")
@@ -99,10 +100,12 @@ async def randomize_activity():
 @tasks.loop(minutes=5)
 async def check_for_game_updates():
     await bot.wait_until_ready()  # have to wait until the bot is ready, or it will open a black hole or something
-    modules.log_seperator()
+    modules.log_separator()
     logger.info("Checking for game updates...")
-    channel = bot.get_channel(GAMEUPDATE_CHANNEL)
+    game_update_channel = GAMEUPDATE_TEST_CHANNEL if DEBUG else GAMEUPDATE_CHANNEL
+    channel = await bot.fetch_channel(game_update_channel)
     steam = modules.SteamUpdates()
+    update_subs = modules.GUpdateSubscribe(utility=True)
     response = steam.get_app_info()
     all_embeds = []
     message = ""
@@ -112,6 +115,10 @@ async def check_for_game_updates():
 
             app = steam.get_app(app_id=int(app))  # getting the app object
             app_id = str(app.id)
+
+            subscribers = update_subs.get_subscribers(app_id)
+            subscribers = [await bot.fetch_user(user_id) for user_id in subscribers]
+            logger.debug(f"Subscribers: {subscribers}")
 
             embed = discord.Embed(
                 color=discord.Color.blue(),
@@ -166,22 +173,31 @@ async def check_for_game_updates():
             all_embeds.append(embed)
             if "public" in altered["new"]:
                 message += f"<@&{discord_role}> "  # mentions all relevant roles, but only if the public branch was updated
+                if len(subscribers) > 0:
+                    for sub in subscribers:
+                        dm_channel = sub.dm_channel
+                        if dm_channel is None:
+                            dm_channel = await sub.create_dm()
+                        await dm_channel.send(embed=embed)
 
         await channel.send(
             message, embeds=all_embeds
         )  # finally sends all of our game update notifications
+
     else:
         logger.info("No game updates found.")
-        modules.log_seperator()
+        modules.log_separator()
 
 
 # starting our scheduled tasks here
-check_for_game_updates.start()
-randomize_activity.start()
+if DEBUG == False:
+    check_for_game_updates.start()
+    randomize_activity.start()
+
 
 # below begins our bot commands, usable on Discord
 
-
+# this command sends a DM to the target telling them to come to the channel the caller is in
 @bot.user_command(name="Summon", guild_ids=[LIVEGUILDID, TESTGUILDID])
 async def Summon(ctx: discord.ApplicationContext, target: discord.User):
     logging.info(f"{ctx.author} summoned {target}.")
@@ -191,8 +207,12 @@ async def Summon(ctx: discord.ApplicationContext, target: discord.User):
     else:
         msg = f"{ctx.author.name} has summoned you to {ctx.author.voice.channel}!"
     await chan.send(msg)
+    await ctx.interaction.response.send_message(
+        f"{target.name} has been summoned.", ephemeral=True
+    )
 
 
+# this command DM's the user who invoked it, a link to the targeted user's avatar
 @bot.user_command(name="GetAvatar", guild_ids=[TESTGUILDID])
 async def GetAvatar(ctx: discord.ApplicationContext, target: discord.User):
     if discord.is_owner(ctx.author):
@@ -207,9 +227,16 @@ async def GetAvatar(ctx: discord.ApplicationContext, target: discord.User):
 @bot.slash_command(name="test", guild_ids=[TESTGUILDID])
 async def test(ctx: discord.ApplicationContext):
     await check_for_game_updates()
-    # steam = modules.SteamUpdates()
-    # bog = steam.get_app_info()
-    # await ctx.send(bog)
+
+
+@bot.slash_command(name="gamesub", guild_ids=[LIVEGUILDID, TESTGUILDID])
+async def gamesub(ctx: discord.ApplicationContext):
+    ui = modules.GUpdateSubscribe(ctx)
+    message = "Select the games you want want to follow below.\nTo confirm, click out of the list.\nTo unsubscribe from a game, uncheck it."
+
+    await ctx.interaction.response.send_message(
+        content=message, view=ui, ephemeral=True, delete_after=60
+    )
 
 
 @bot.slash_command(  # this rolls the bones, inputs are size, and count - size is the size of the die, count is how many dice you wish to roll
@@ -317,7 +344,7 @@ async def three_x(ctx: discord.ApplicationContext, number):
     await ctx.respond(f"> {modules.magicmath(number)}")
 
 
-@bot.slash_command(  # this makes an API call to "Le-Systeme Solaire" and retrieved orbital information about the requested body
+@bot.slash_command(  # this makes an API call to "Le-Systeme Solaire" and retrieved orbital information about the requested body - this is old and super over-engineered
     name="orbit",
     description="Get Orbital information about a given body in our Solar System",
     guild_ids=[TESTGUILDID, LIVEGUILDID],
