@@ -27,6 +27,10 @@ This function is nowhere near perfect, but it works fairly well and is very cons
 Updated `slasherUtils.py` with useful functions/classes.
 Removed all the `.json` files and `.bat` files as they're mostly useless. If for whatever reason you're interested in the raw API data, please check out the sources listed below.
 
+--
+
+Users can now subscribe to game update notifications to have them delivered via DMs. Currently having some issues with preference storage but it mostly works as intended.
+
 ## Starship API
 
 ### _API by [@NoahPrail](https://twitter.com/NoahPrail) on Twitter and [starshipstatus.space](https://starshipstatus.space/)_
