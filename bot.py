@@ -24,7 +24,7 @@ DEBUG = False
 
 DIR = os.path.dirname(os.path.realpath(__file__))
 LOG_FILE = os.path.join(DIR, "logs", f"bot_{modules.get_timestamp(day_only=True)}.log")
-LOG_LEVEL = logging.DEBUG
+LOG_LEVEL = logging.DEBUG if DEBUG else logging.INFO
 
 bot = discord.Bot(
     command_prefix="!",
@@ -97,7 +97,7 @@ async def randomize_activity():
 
 
 # this function checks for game updates on steam, then posts them to the appropriate channel, pinging the correct roles
-@tasks.loop(minutes=5)
+@tasks.loop(minutes=15, reconnect=True)
 async def check_for_game_updates():
     await bot.wait_until_ready()  # have to wait until the bot is ready, or it will open a black hole or something
     modules.log_separator()
@@ -123,7 +123,7 @@ async def check_for_game_updates():
             embed = discord.Embed(
                 color=discord.Color.blue(),
                 title="Game Update",
-                description=f"{modules.get_date()} CDT",
+                description=f"{modules.get_date()} GMT",
                 url=f"https://steamdb.info/app/{app_id}",
             )
 
@@ -194,7 +194,6 @@ if DEBUG == False:
     check_for_game_updates.start()
     randomize_activity.start()
 
-
 # below begins our bot commands, usable on Discord
 
 # this command sends a DM to the target telling them to come to the channel the caller is in
@@ -202,11 +201,17 @@ if DEBUG == False:
 async def Summon(ctx: discord.ApplicationContext, target: discord.User):
     logging.info(f"{ctx.author} summoned {target}.")
     chan = await target.create_dm()
-    if ctx.author.voice == None:
-        msg = f"{ctx.author.name} has summoned you!"
-    else:
-        msg = f"{ctx.author.name} has summoned you to {ctx.author.voice.channel}!"
-    await chan.send(msg)
+
+    embed = discord.Embed(
+        color=discord.Color.blue(),
+        title="You have been summoned.",
+    )
+    embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.display_avatar)
+
+    if ctx.author.voice != None:
+        embed.description = f"Join their voice channel here: <#{ctx.author.voice.channel.id}>"
+
+    await chan.send(embed=embed)
     await ctx.interaction.response.send_message(
         f"{target.name} has been summoned.", ephemeral=True
     )
@@ -274,17 +279,20 @@ async def slashRoll(ctx: discord.ApplicationContext, size: int, count: int = 1):
         description=f"{author.name}'s Rolls: ",
         colour=discord.Colour.red(),
     )
-    embed.set_footer(text=f"This is not rigged in any way.")
+    embed.set_footer(text=f"This is not rigged.")
     embed.set_author(name=author.name, icon_url=author.display_avatar)
+    roll_string = ""
     n = 1
     for roll in rolls:
-        embed.add_field(name=f"Roll {n}:", value=roll, inline=False)
+        new_roll_str = f"Roll {n}: {roll}\n"
+        roll_string += new_roll_str
         n += 1
         if n >= 10:
             break
 
+    embed.add_field(name="Rolls", value=roll_string)
     embed.add_field(name="Total: ", value=sum(rolls), inline=False)
-    await ctx.respond(embed=embed)
+    await ctx.interaction.response.send_message(embed=embed)
 
 
 @bot.slash_command(  # this returns data from the starship status API, more details on that in modules/starship
@@ -442,7 +450,7 @@ async def server_join_msg(ctx: discord.ApplicationContext):
     embed = discord.Embed(
         title="Slasher Servers", description=message, colour=discord.Colour.blue()
     )
-    await ctx.respond(embed=embed)
+    await ctx.interaction.response.send_message(embed=embed)
 
 
 if __name__ == "__main__":
